@@ -55,7 +55,7 @@ CREATE DATABASE task_db;
 3. The required `.env` is already included and must remain exactly:
 
 ```env
-DATABASE_URL=mysql+pymysql://root:Amit1234@#/localhost:3306/task_db
+DATABASE_URL=mysql+pymysql://root:Password/localhost:3306/task_db
 ```
 
 Note: `#` is a reserved URL character; the application safely encodes it internally at runtime so SQLAlchemy can connect.
