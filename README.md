@@ -1,207 +1,279 @@
-# Task Management API
+# Task Management API (FastAPI + MySQL)
 
-A small **FastAPI** backend with **SQLite**, **SQLAlchemy 2.x**, and **Alembic** migrations. Tasks support create, list (with filters), status update, and delete.
+Backend API for creating, listing, updating, editing, and deleting tasks.
+Includes:
+- JSON API endpoints
+- Browser Task UI
+- ReDoc API documentation
 
-## Features
+## Tech Stack
 
-- **POST /tasks** — Create a task; `status` defaults to `pending`.
-- **GET /tasks** — List tasks, optional `status` and `start_date` / `end_date` filters; newest first.
-- **PUT /tasks/{id}** — Update **only** `status` (`pending`, `in_progress`, `completed`).
-- **DELETE /tasks/{id}** — Remove a task.
-- **5-second duplicate title rule** — Second create with the same `title` within 5 seconds returns **409 Conflict**.
-- **Pydantic** validation for request/response bodies.
-- **Structured JSON errors** for conflicts, not found, and bad date ranges.
-- **Request logging middleware** (method, path, status, duration, short request id).
+- Python + FastAPI
+- MySQL
+- SQLAlchemy ORM
+- Pydantic validation
+- Environment variables via `python-dotenv`
 
-## Project layout
+## Project Structure
 
 ```
 app/
-  core/
-    config.py          # Settings (e.g. DATABASE_URL)
-  database/
-    base.py            # SQLAlchemy DeclarativeBase
-    session.py         # Engine, SessionLocal, get_db
-  models/
-    task.py            # Task ORM model + TaskStatus enum
-  routers/
-    tasks.py           # Task routes
-  schemas/
-    task.py            # Pydantic schemas
-  main.py              # FastAPI app, middleware, exception handler
-alembic/
-  versions/
-    001_initial_tasks.py
-  env.py
-alembic.ini
+│── main.py
+│── database/
+│   ├── connection.py
+│   ├── base.py
+│── models/
+│   ├── task.py
+│── schemas/
+│   ├── task.py
+│── routers/
+│   ├── task_router.py
+│── services/
+│   ├── task_service.py
+│── middleware/
+│   ├── logging.py
+│── core/
+│   ├── config.py
+│
+.env
 requirements.txt
+README.md
 ```
 
-## Requirements
+## MySQL Setup
 
-- Python **3.9+** (3.10+ recommended).
-- Dependencies are listed in `requirements.txt`. On Windows, `greenlet` is pinned so pip can install a **binary wheel** without a C++ compiler.
+1. Ensure MySQL is running on:
+   - host: `localhost`
+   - port: `3306`
 
-## Setup
+2. Create the database:
 
-1. **Create and activate a virtual environment** (recommended):
+```sql
+CREATE DATABASE task_db;
+```
 
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\activate
-   ```
+3. The required `.env` is already included and must remain exactly:
 
-2. **Install dependencies**:
+```env
+DATABASE_URL=mysql+pymysql://root:Amit1234@#/localhost:3306/task_db
+```
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+Note: `#` is a reserved URL character; the application safely encodes it internally at runtime so SQLAlchemy can connect.
 
-3. **Configure database** (optional):
+## Installation
 
-   Default is SQLite at `./tasks.db`. Override with an environment variable:
-
-   ```bash
-   set DATABASE_URL=sqlite:///./tasks.db
-   ```
-
-   For PostgreSQL later, use something like:
-
-   ```bash
-   set DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/tasks
-   ```
-
-4. **Run migrations**:
-
-   ```bash
-   python -m alembic upgrade head
-   ```
+```bash
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+```
 
 ## Run the API
 
-From the project root:
-
 ```bash
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --port 8011
 ```
 
-- Interactive docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- Health check: `GET /health`
-
-## API usage examples
-
-### Create task (201)
+Or run using the module entrypoint:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/tasks ^
-  -H "Content-Type: application/json" ^
-  -d "{\"title\": \"Buy milk\", \"description\": \"2% organic\"}"
+python app/main.py
 ```
 
-**Example success response** (201):
+## App URLs
+
+- Task UI (root): `http://127.0.0.1:8011/`
+- Task UI (alias): `http://127.0.0.1:8011/ui`
+- ReDoc: `http://127.0.0.1:8011/redoc`
+- Health check: `http://127.0.0.1:8011/health`
+
+## API Endpoints
+
+### 1) Create Task
+
+**POST** `/tasks`
+
+Request:
+
+```json
+{
+  "title": "My Task",
+  "description": "Optional details"
+}
+```
+
+Success (201):
 
 ```json
 {
   "id": 1,
-  "title": "Buy milk",
-  "description": "2% organic",
+  "title": "My Task",
+  "description": "Optional details",
   "status": "pending",
-  "created_at": "2026-04-15T05:00:00Z"
+  "created_at": "2026-04-15T10:20:30"
 }
 ```
 
-### Duplicate title within 5 seconds (409)
+Validation:
+- `title` is required
+- `title` length: 1 to 255
+
+### 2) Get Tasks (optional filters)
+
+**GET** `/tasks`
+
+Query params:
+- `status` (optional): `pending | in_progress | completed`
+- `start_date` (optional): ISO datetime (e.g. `2026-04-15T00:00:00`)
+- `end_date` (optional): ISO datetime
+
+Example:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/tasks -H "Content-Type: application/json" -d "{\"title\":\"Same\"}"
-curl -s -X POST http://127.0.0.1:8000/tasks -H "Content-Type: application/json" -d "{\"title\":\"Same\"}"
+curl "http://127.0.0.1:8011/tasks?status=pending"
 ```
 
-**Example error response** (409):
+Response (200, newest first):
 
 ```json
-{
-  "error": {
-    "code": "duplicate_title",
-    "message": "A task with this title was created within the last 5 seconds."
+[
+  {
+    "id": 2,
+    "title": "Newest task",
+    "description": null,
+    "status": "pending",
+    "created_at": "2026-04-15T10:21:00"
   }
-}
+]
 ```
 
-### List tasks with filters (200)
+### 3) Update Task Status Only
 
-```bash
-curl -s "http://127.0.0.1:8000/tasks?status=pending"
-curl -s "http://127.0.0.1:8000/tasks?start_date=2026-04-01T00:00:00Z&end_date=2026-04-30T23:59:59Z"
-```
+**PUT** `/tasks/{id}`
 
-**Example response** (200):
+Request:
 
 ```json
 {
-  "items": [
-    {
-      "id": 2,
-      "title": "Write README",
-      "description": null,
-      "status": "pending",
-      "created_at": "2026-04-15T05:01:00Z"
-    }
-  ],
-  "count": 1
+  "status": "completed"
 }
 ```
 
-### Update status only (200)
-
-```bash
-curl -s -X PUT http://127.0.0.1:8000/tasks/1 ^
-  -H "Content-Type: application/json" ^
-  -d "{\"status\": \"in_progress\"}"
-```
-
-Invalid enum (e.g. `"status": "done"`) returns **422** with FastAPI validation details.
-
-### Delete task (204 / 404)
-
-```bash
-curl -s -o NUL -w "%%{http_code}" -X DELETE http://127.0.0.1:8000/tasks/1
-```
-
-**Not found** (404):
+Success (200):
 
 ```json
 {
-  "error": {
-    "code": "not_found",
-    "message": "Task with id 99 was not found."
-  }
+  "id": 1,
+  "title": "My Task",
+  "description": "Optional details",
+  "status": "completed",
+  "created_at": "2026-04-15T10:20:30"
 }
 ```
 
-## Duplicate title rule (5 seconds)
+### 4) Edit Task Title/Description
 
-On **POST /tasks**, the server looks for an existing row with the **same `title`** (case-sensitive) **and** `created_at` within the **last 5 seconds** (UTC). If found, the API returns **409 Conflict** with `code: duplicate_title`. After 5 seconds, the same title is allowed again.
+**PUT** `/tasks/{id}/edit`
 
-## Example responses summary
+Request:
 
-| Situation | HTTP status | `error.code` (if any) |
-|-----------|-------------|------------------------|
-| Created | 201 | — |
-| Duplicate title within 5s | 409 | `duplicate_title` |
-| Task not found | 404 | `not_found` |
-| Invalid date range (`start_date` > `end_date`) | 400 | `invalid_date_range` |
-| Validation (e.g. bad status) | 422 | FastAPI default |
+```json
+{
+  "title": "Updated title",
+  "description": "Updated description"
+}
+```
 
-## Optional improvements
+Success (200):
 
-- **Authentication** — Add JWT or API keys; scope duplicate-title checks per user if `user_id` is present.
-- **PostgreSQL in production** — Switch `DATABASE_URL` and run migrations against Postgres.
-- **Pagination** — `limit` / `offset` or cursor on `GET /tasks`.
-- **Rate limiting** — Protect create endpoint from abuse.
-- **Tests** — `pytest` + `httpx` `TestClient` (already in `requirements.txt`).
-- **Structured logging** — JSON logs for aggregation (ELK, CloudWatch).
+```json
+{
+  "id": 1,
+  "title": "Updated title",
+  "description": "Updated description",
+  "status": "pending",
+  "created_at": "2026-04-15T10:20:30"
+}
+```
 
-## License
+### 5) Delete Task
 
-Use freely for learning or as a starting point for your own project.
+**DELETE** `/tasks/{id}`
+
+Success (200):
+
+```json
+{
+  "message": "Task deleted"
+}
+```
+
+If not found (404):
+
+```json
+{
+  "error": "Task not found"
+}
+```
+
+## Error Responses
+
+### Duplicate task in 5-second window
+
+- Condition: same `title` created within last 5 seconds
+- Response: **409 Conflict**
+
+```json
+{
+  "error": "Task with same title created recently"
+}
+```
+
+### Validation errors
+
+- FastAPI returns **422 Unprocessable Entity** for invalid payload/query formats.
+
+## Notes on Business Rule
+
+A task cannot be created if another task with the same title exists in the past 5 seconds.
+
+MySQL-style logic:
+
+```sql
+SELECT * FROM tasks
+WHERE title = ?
+AND created_at >= NOW() - INTERVAL 5 SECOND;
+```
+
+## Middleware Logging
+
+Each request logs:
+- HTTP method
+- URL path
+- execution time (ms)
+
+Example output:
+```
+POST /tasks 12.34ms
+```
+
+## Current Route Summary
+
+- `GET /` -> Task UI (HTML)
+- `GET /ui` -> Task UI (HTML alias)
+- `GET /health` -> JSON health response
+- `GET /redoc` -> ReDoc documentation
+- `POST /tasks` -> Create task
+- `GET /tasks` -> List/filter tasks
+- `PUT /tasks/{id}` -> Update status only
+- `PUT /tasks/{id}/edit` -> Edit title/description
+- `DELETE /tasks/{id}` -> Delete task
+
+## Bonus: Suggested Improvements (Optional)
+
+- Add Alembic migrations instead of `create_all` at startup
+- Add pagination to `GET /tasks`
+- Add user ownership/authentication
+- Add unique constraints / idempotency keys for stronger duplicate protection across distributed systems
+
+
