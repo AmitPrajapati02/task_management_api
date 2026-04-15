@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+env/
+*.db
+.env
+.idea/
+.vscode/
+*.log
+alembic.ini.bak
+.venv/
+__pycache__/
+.env

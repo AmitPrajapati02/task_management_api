@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Management</title>
+    <style>
+      :root { color-scheme: light; }
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background: #f6f7fb; color: #111827; }
+      header { background: white; border-bottom: 1px solid #e5e7eb; }
+      .wrap { max-width: 980px; margin: 0 auto; padding: 18px 16px; }
+      h1 { margin: 0; font-size: 18px; font-weight: 700; }
+      .sub { margin-top: 6px; font-size: 13px; color: #6b7280; }
+      .grid { display: grid; grid-template-columns: 1fr; gap: 12px; padding: 16px; max-width: 980px; margin: 0 auto; }
+      @media (min-width: 900px) { .grid { grid-template-columns: 420px 1fr; } }
+      .card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+      .row { display: grid; gap: 8px; margin-top: 10px; }
+      label { font-size: 12px; color: #374151; }
+      input, textarea, select { width: 100%; padding: 10px 10px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; box-sizing: border-box; }
+      textarea { resize: vertical; min-height: 90px; }
+      .btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+      button { border: 1px solid #d1d5db; background: #111827; color: white; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+      button.secondary { background: white; color: #111827; }
+      button.danger { background: #b91c1c; border-color: #b91c1c; }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+      .toolbar > div { min-width: 170px; flex: 1; }
+      .tasks { display: grid; gap: 10px; margin-top: 12px; }
+      .task { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+      .taskTop { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+      .title { font-weight: 800; }
+      .meta { font-size: 12px; color: #6b7280; }
+      .desc { font-size: 13px; color: #374151; white-space: pre-wrap; }
+      .inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #e5e7eb; background: #f9fafb; }
+      .pill.pending { border-color: #c7d2fe; background: #eef2ff; }
+      .pill.in_progress { border-color: #fde68a; background: #fffbeb; }
+      .pill.completed { border-color: #bbf7d0; background: #ecfdf5; }
+      .msg { margin-top: 10px; font-size: 13px; }
+      .msg.ok { color: #065f46; }
+      .msg.err { color: #991b1b; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+      footer { padding: 18px 16px; max-width: 980px; margin: 0 auto; color: #6b7280; font-size: 12px; }
+      a { color: #111827; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <h1>Task Management</h1>
+        <div class="sub">
+          Simple UI for your API. API docs at <a href="/docs" target="_blank" rel="noreferrer">/docs</a>.
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div style="font-weight: 800">Create task</div>
+        <div class="row">
+          <div>
+            <label for="title">Title</label>
+            <input id="title" placeholder="e.g. Buy groceries" maxlength="500" />
+          </div>
+          <div>
+            <label for="description">Description (optional)</label>
+            <textarea id="description" placeholder="Details..."></textarea>
+          </div>
+        </div>
+        <div class="btns">
+          <button id="createBtn">Create</button>
+          <button class="secondary" id="clearBtn" type="button">Clear</button>
+        </div>
+        <div id="createMsg" class="msg"></div>
+        <div class="sub" style="margin-top: 10px">
+          Duplicate title within 5 seconds returns <code>409</code>.
+        </div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+          <div style="font-weight: 800">Tasks</div>
+          <div class="meta">Latest first</div>
+        </div>
+
+        <div class="toolbar" style="margin-top: 10px">
+          <div>
+            <label for="statusFilter">Status filter</label>
+            <select id="statusFilter">
+              <option value="">All</option>
+              <option value="pending">pending</option>
+              <option value="in_progress">in_progress</option>
+              <option value="completed">completed</option>
+            </select>
+          </div>
+          <div>
+            <label for="startDate">Start date (optional)</label>
+            <input id="startDate" placeholder="2026-04-01T00:00:00Z" />
+          </div>
+          <div>
+            <label for="endDate">End date (optional)</label>
+            <input id="endDate" placeholder="2026-04-30T23:59:59Z" />
+          </div>
+          <div style="flex: 0 0 auto;">
+            <button id="refreshBtn" class="secondary" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div id="listMsg" class="msg"></div>
+        <div id="tasks" class="tasks"></div>
+      </section>
+    </div>
+
+    <footer>
+      Tips: use the status dropdown on each task to update it, or delete it. If you see an error, it will show the API's structured JSON message.
+    </footer>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      function setMsg(el, kind, text) {
+        el.className = "msg " + (kind || "");
+        el.textContent = text || "";
+      }
+
+      function qs(obj) {
+        const p = new URLSearchParams();
+        for (const [k, v] of Object.entries(obj)) {
+          if (v === undefined || v === null || v === "") continue;
+          p.set(k, v);
+        }
+        const s = p.toString();
+        return s ? "?" + s : "";
+      }
+
+      async function api(url, options) {
+        const res = await fetch(url, {
+          headers: { "Content-Type": "application/json", ...(options && options.headers ? options.headers : {}) },
+          ...options,
+        });
+        const isJson = (res.headers.get("content-type") || "").includes("application/json");
+        const body = isJson ? await res.json() : await res.text();
+        if (!res.ok) {
+          let msg = "Request failed";
+          if (body && body.error && body.error.message) msg = body.error.message;
+          else if (typeof body === "string" && body) msg = body;
+          const err = new Error(msg);
+          err.status = res.status;
+          err.body = body;
+          throw err;
+        }
+        return body;
+      }
+
+      function pill(status) {
+        const span = document.createElement("span");
+        span.className = "pill " + status;
+        span.textContent = status;
+        return span;
+      }
+
+      function taskCard(t) {
+        const wrap = document.createElement("div");
+        wrap.className = "task";
+
+        const top = document.createElement("div");
+        top.className = "taskTop";
+
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = t.title;
+        left.appendChild(title);
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = `id=${t.id} • ${t.created_at}`;
+        left.appendChild(meta);
+
+        top.appendChild(left);
+        top.appendChild(pill(t.status));
+        wrap.appendChild(top);
+
+        if (t.description) {
+          const d = document.createElement("div");
+          d.className = "desc";
+          d.textContent = t.description;
+          wrap.appendChild(d);
+        }
+
+        const actions = document.createElement("div");
+        actions.className = "inline";
+
+        const sel = document.createElement("select");
+        ["pending", "in_progress", "completed"].forEach((s) => {
+          const o = document.createElement("option");
+          o.value = s;
+          o.textContent = s;
+          if (s === t.status) o.selected = true;
+          sel.appendChild(o);
+        });
+
+        const save = document.createElement("button");
+        save.textContent = "Update status";
+        save.className = "secondary";
+
+        const del = document.createElement("button");
+        del.textContent = "Delete";
+        del.className = "danger";
+
+        const msg = document.createElement("div");
+        msg.className = "meta";
+
+        save.onclick = async () => {
+          save.disabled = true;
+          setMsg(msg, "", "Updating...");
+          try {
+            const updated = await api(`/tasks/${t.id}`, { method: "PUT", body: JSON.stringify({ status: sel.value }) });
+            setMsg(msg, "ok", "Updated.");
+            // re-render pill to match
+            wrap.querySelector(".pill").replaceWith(pill(updated.status));
+          } catch (e) {
+            setMsg(msg, "err", `Error (${e.status}): ${e.message}`);
+          } finally {
+            save.disabled = false;
+          }
+        };
+
+        del.onclick = async () => {
+          if (!confirm(`Delete task ${t.id}?`)) return;
+          del.disabled = true;
+          setMsg(msg, "", "Deleting...");
+          try {
+            await api(`/tasks/${t.id}`, { method: "DELETE" });
+            wrap.remove();
+          } catch (e) {
+            setMsg(msg, "err", `Error (${e.status}): ${e.message}`);
+          } finally {
+            del.disabled = false;
+          }
+        };
+
+        actions.appendChild(sel);
+        actions.appendChild(save);
+        actions.appendChild(del);
+        wrap.appendChild(actions);
+        wrap.appendChild(msg);
+        return wrap;
+      }
+
+      async function refresh() {
+        const msg = $("listMsg");
+        setMsg(msg, "", "Loading...");
+        $("tasks").innerHTML = "";
+        try {
+          const data = await api("/tasks" + qs({
+            status: $("statusFilter").value,
+            start_date: $("startDate").value.trim(),
+            end_date: $("endDate").value.trim(),
+          }));
+          setMsg(msg, "ok", `Loaded ${data.count} task(s).`);
+          data.items.forEach((t) => $("tasks").appendChild(taskCard(t)));
+        } catch (e) {
+          setMsg(msg, "err", `Error (${e.status || "?"}): ${e.message}`);
+          if (e.body) console.debug("API error body:", e.body);
+        }
+      }
+
+      $("createBtn").onclick = async () => {
+        const title = $("title").value.trim();
+        const description = $("description").value.trim();
+        const msg = $("createMsg");
+        setMsg(msg, "", "");
+        if (!title) {
+          setMsg(msg, "err", "Title is required.");
+          return;
+        }
+        $("createBtn").disabled = true;
+        try {
+          await api("/tasks", { method: "POST", body: JSON.stringify({ title, description: description || null }) });
+          setMsg(msg, "ok", "Created.");
+          $("title").value = "";
+          $("description").value = "";
+          await refresh();
+        } catch (e) {
+          setMsg(msg, "err", `Error (${e.status}): ${e.message}`);
+          if (e.body) console.debug("API error body:", e.body);
+        } finally {
+          $("createBtn").disabled = false;
+        }
+      };
+
+      $("clearBtn").onclick = () => {
+        $("title").value = "";
+        $("description").value = "";
+        setMsg($("createMsg"), "", "");
+      };
+      $("refreshBtn").onclick = refresh;
+      $("statusFilter").onchange = refresh;
+
+      refresh();
+    </script>
+  </body>
+</html>
+

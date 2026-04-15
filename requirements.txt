@@ -1,0 +1,12 @@
+# Task Management API — Python dependencies
+# Pin greenlet first so pip picks a wheel on Windows (avoids source builds needing MSVC).
+greenlet>=3.0.3
+fastapi==0.115.6
+# Use plain uvicorn (no [standard]) for easier installs on Windows without C++ build tools.
+uvicorn==0.34.0
+sqlalchemy==2.0.36
+alembic==1.14.0
+pydantic==2.10.3
+pydantic-settings==2.6.1
+httpx==0.28.1
+jinja2==3.1.4
